@@ -11,6 +11,41 @@
       </div>
     </header>
 
+    <section class="panel">
+      <header class="panel-head">
+        <div>
+          <h3>塔顶裁决牌（只读）</h3>
+          <p class="muted">ADS 只读取质量校验塔顶的裁决牌，看不到被扣留行的明细证据。</p>
+        </div>
+        <button class="btn" type="button" @click="loadTopCards">刷新塔顶牌</button>
+      </header>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>裁决牌号</th><th>冲突簇编号</th><th>判词塔</th><th>输出表.目标字段</th>
+            <th>结论</th><th>阻断级别</th><th>扣留行数</th><th>封牌版本</th><th>牌根批次</th><th>封牌时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="card in topCards" :key="card.cardNo">
+            <td>{{ card.cardNo }}</td>
+            <td>{{ card.clusterNo }}</td>
+            <td>{{ card.towerNo }}</td>
+            <td>{{ card.tableName }}.{{ card.targetField }}</td>
+            <td><span class="badge" :class="verdictClass(card.verdict)">{{ card.verdict }}</span></td>
+            <td>{{ card.blockLevel }}</td>
+            <td>{{ card.withheldCount }}</td>
+            <td>v{{ card.thresholdVersion }}</td>
+            <td>{{ card.rootBatchNo }}</td>
+            <td>{{ card.sealedAt }}</td>
+          </tr>
+          <tr v-if="!topCards.length">
+            <td colspan="10" class="empty-state">质量校验还没有封牌，ADS 暂无可用裁决牌</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <div class="stat-row">
       <article v-for="item in stats" :key="item.label" class="stat-card">
         <span class="stat-label">{{ item.label }}</span>
@@ -79,6 +114,8 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { listTopCards } from '@/api/tower-service'
+import type { TopCardReadModel, Verdict } from '@/data/tower-types'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('ads')
@@ -90,6 +127,7 @@ const stats = [{"label": "应用数据集总数", "value": 0}, {"label": "已发
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const topCards = ref<TopCardReadModel[]>([])
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
@@ -133,5 +171,17 @@ function reload() {
   }
 }
 
-onMounted(reload)
+function loadTopCards() {
+  // 只读投影：塔顶一张牌，拿不到证据针的字段。
+  topCards.value = listTopCards()
+}
+
+function verdictClass(verdict: Verdict): string {
+  return verdict === '阻断' ? 'block' : verdict === '扣留' ? 'withhold' : 'pass'
+}
+
+onMounted(() => {
+  loadTopCards()
+  reload()
+})
 </script>

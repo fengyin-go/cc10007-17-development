@@ -67,6 +67,27 @@ npm run build
   `frontend/src/api/local-service.ts`。
 - 字段、状态、动作与流转目标集中在 `frontend/src/data/modules.ts`；示例数据在
   `frontend/src/data/seed.ts`。
+
+## 质量校验：判词塔
+
+质量校验页在通用规则表之外多了一层「判词塔」：目标字段在时间切片上逐一叠加校验表达式、阈值、
+采样率与阻断级别，塔顶为每个切片落一张带**冲突簇编号**的裁决牌。
+
+- 读写全部在 `frontend/src/api/tower-service.ts`，类型与示例在 `frontend/src/data/tower-types.ts`、
+  `tower-seed.ts`，存档在 `data-layer-studio:tower`（与主数据分开，重置主数据不影响封牌历史）。
+- **读取口径分离**：应用层发布（ADS）只读 `listTopCards()` 的塔顶牌投影，字段里没有证据明细；
+  清洗加工读 `listNeedlesForCleanse()` 返回的被扣留行证据针（正卷）。
+- **换阈值不翻案**：`updateThreshold()` 只升塔的生效版本，已封牌切片保留原牌；只有未封牌切片按新
+  阈值重算后封牌。
+- **同号重放返回原牌**：`sealSlice()` 命中已有封牌号时直接返回原牌，不重新裁决、不追加证据；
+  同一落败批次重复争抢也不会重复追加副卷证据。
+- **并行争抢只留一个牌根**：同一塔同一时间切片已有牌根时，后到批次不再封牌，其证据整批进入副卷
+  （`volume: '副卷'`），牌面只记 `secondaryBatchNo`。
+- **回看以质量校验为主对象**：`reviewCard()` 先返回质量规则与塔顶牌的阻断结论，证据针与处置记录
+  只作附件。
+- **处置记录**：`reconcileDispositions()` 按 `ticket_residue`（残留）、`silent_rule`（不生效）、
+  `level_drift`（显示成上一档）、`cluster_shift`（错位）四类核对，每条处置都落处置号（`CZ-xxxx`），
+  同一张牌同一类问题重复核对不重复发号。
 - 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
 - 想回到初始数据：清掉浏览器里 `data-layer-studio:entries` 这一项，或调用 `resetModule(模块)`。
 

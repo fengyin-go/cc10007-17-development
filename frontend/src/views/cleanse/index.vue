@@ -11,6 +11,51 @@
       </div>
     </header>
 
+    <section class="panel">
+      <header class="panel-head">
+        <div>
+          <h3>被扣留行证据针（正卷）</h3>
+          <p class="muted">清洗加工按牌号读取被扣留行的证据针；副卷只登记批次，不参与本次清洗。</p>
+        </div>
+        <label class="field inline-field">
+          <span>判词塔</span>
+          <select v-model="needleTowerNo">
+            <option v-for="tower in towers" :key="tower.towerNo" :value="tower.towerNo">
+              {{ tower.towerNo }} · {{ tower.tableName }}.{{ tower.targetField }}
+            </option>
+          </select>
+        </label>
+      </header>
+      <p class="muted">
+        正卷证据 {{ positiveNeedles.length }} 条 ·
+        副卷证据 {{ secondaryNeedles.length }} 条 ·
+        涉及裁决牌 {{ needleCardCount }} 张
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>证据针号</th><th>裁决牌号</th><th>冲突簇</th><th>时间切片</th>
+            <th>目标字段</th><th>行号</th><th>实测值</th><th>扣留原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="needle in positiveNeedles" :key="needle.needleNo">
+            <td>{{ needle.needleNo }}</td>
+            <td>{{ needle.cardNo }}</td>
+            <td>{{ needle.clusterNo }}</td>
+            <td>{{ needle.sliceKey }}</td>
+            <td>{{ needle.targetField }}</td>
+            <td>{{ needle.rowNo }}</td>
+            <td>{{ needle.observedValue }}</td>
+            <td>{{ needle.reason }}</td>
+          </tr>
+          <tr v-if="!positiveNeedles.length">
+            <td colspan="8" class="empty-state">这座塔没有正卷证据，清洗无需处理被扣留行</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <div class="stat-row">
       <article v-for="item in stats" :key="item.label" class="stat-card">
         <span class="stat-label">{{ item.label }}</span>
@@ -79,6 +124,8 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { listNeedlesForCleanse, listSecondaryNeedles, listTowers } from '@/api/tower-service'
+import type { JudgmentTower } from '@/data/tower-types'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('cleanse')
@@ -91,6 +138,17 @@ const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
+const towers = ref<JudgmentTower[]>([])
+const needleTowerNo = ref('')
+const positiveNeedles = computed(() =>
+  needleTowerNo.value ? listNeedlesForCleanse(needleTowerNo.value) : [],
+)
+const secondaryNeedles = computed(() =>
+  needleTowerNo.value ? listSecondaryNeedles(needleTowerNo.value) : [],
+)
+const needleCardCount = computed(
+  () => new Set(positiveNeedles.value.map((needle) => needle.cardNo)).size,
+)
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
@@ -133,5 +191,11 @@ function reload() {
   }
 }
 
-onMounted(reload)
+onMounted(() => {
+  towers.value = listTowers()
+  if (!needleTowerNo.value && towers.value.length) {
+    needleTowerNo.value = towers.value[0].towerNo
+  }
+  reload()
+})
 </script>
